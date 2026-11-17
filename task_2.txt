@@ -1,0 +1,261 @@
+
+#include <iostream>
+#include <vector>
+#include <fstream>
+#include <sstream>
+#include <string>
+#include <stdexcept>
+#include <algorithm>
+using namespace std;
+
+// Base class
+class Student {
+protected:
+    int rollNo;
+    string name;
+
+public:
+    Student(int r, const string& n)
+        : rollNo(r), name(n) {}
+
+    virtual void displayDetails() const {
+        cout << "Roll No: " << rollNo << "\n";
+        cout << "Name: " << name << "\n";
+    }
+
+    virtual void displayMarks() const {
+        cout << "Marks are not available.\n";
+    }
+
+    virtual ~Student() {}
+};
+
+// Derived class
+class Result : public Student {
+private:
+    float mark1, mark2, mark3;
+
+    void validateMarks(float m) const {
+        if (m < 0 || m > 100) {
+            throw invalid_argument(
+                "Marks must be between 0 and 100."
+            );
+        }
+    }
+
+public:
+    Result(int r, const string& n,
+           float m1, float m2, float m3)
+        : Student(r, n),
+          mark1(m1), mark2(m2), mark3(m3) {
+
+        validateMarks(mark1);
+        validateMarks(mark2);
+        validateMarks(mark3);
+    }
+
+    int getRollNo() const {
+        return rollNo;
+    }
+
+    string getName() const {
+        return name;
+    }
+
+    float getMark1() const { return mark1; }
+    float getMark2() const { return mark2; }
+    float getMark3() const { return mark3; }
+
+    float getTotal() const {
+        return mark1 + mark2 + mark3;
+    }
+
+    float getPercentage() const {
+        return getTotal() / 3.0f;
+    }
+
+    string getResult() const {
+        if (mark1 >= 35 && mark2 >= 35 &&
+            mark3 >= 35)
+            return "PASS";
+
+        return "FAIL";
+    }
+
+    // Overriding virtual functions
+    void displayDetails() const override {
+        cout << "Roll No: " << rollNo << "\n";
+        cout << "Name: " << name << "\n";
+    }
+
+    void displayMarks() const override {
+        cout << "Subject 1: " << mark1 << "\n";
+        cout << "Subject 2: " << mark2 << "\n";
+        cout << "Subject 3: " << mark3 << "\n";
+
+        cout << "Total Marks: "
+             << getTotal() << " / 300\n";
+
+        cout << "Percentage: "
+             << getPercentage() << "%\n";
+
+        cout << "Result: "
+             << getResult() << "\n";
+    }
+
+    void displayRecord() const {
+        displayDetails();
+        displayMarks();
+    }
+};
+
+// Save records to file
+void saveToFile(const vector<Result>& students,
+                const string& fileName) {
+
+    ofstream outFile(fileName);
+
+    if (!outFile) {
+        throw runtime_error(
+            "Unable to open file for writing."
+        );
+    }
+
+    for (const Result& s : students) {
+        outFile << s.getRollNo() << "|"
+                << s.getName() << "|"
+                << s.getMark1() << "|"
+                << s.getMark2() << "|"
+                << s.getMark3() << "\n";
+    }
+}
+
+// Retrieve records from file
+vector<Result> loadFromFile(
+    const string& fileName) {
+
+    ifstream inFile(fileName);
+
+    if (!inFile) {
+        throw runtime_error(
+            "Unable to open file for reading."
+        );
+    }
+
+    vector<Result> loadedStudents;
+    string line;
+
+    while (getline(inFile, line)) {
+        stringstream ss(line);
+
+        string rollText, studentName;
+        string m1Text, m2Text, m3Text;
+
+        if (getline(ss, rollText, '|') &&
+            getline(ss, studentName, '|') &&
+            getline(ss, m1Text, '|') &&
+            getline(ss, m2Text, '|') &&
+            getline(ss, m3Text, '|')) {
+
+            try {
+                int roll = stoi(rollText);
+                float m1 = stof(m1Text);
+                float m2 = stof(m2Text);
+                float m3 = stof(m3Text);
+
+                loadedStudents.emplace_back(
+                    roll, studentName, m1, m2, m3
+                );
+
+            } catch (const exception& e) {
+                cerr << "Skipping invalid file record: "
+                     << e.what() << "\n";
+            }
+        }
+    }
+
+    return loadedStudents;
+}
+
+int main() {
+
+    vector<Result> students;
+
+    try {
+        // Creating student records
+        students.emplace_back(
+            101, "Rahul Sharma", 88, 76, 91
+        );
+
+        students.emplace_back(
+            102, "Priya Nair", 95, 89, 92
+        );
+
+        students.emplace_back(
+            103, "Aman Kumar", 65, 72, 68
+        );
+
+        // Exception handling
+        try {
+            students.emplace_back(
+                104, "Invalid Student", 110, 75, 80
+            );
+        }
+        catch (const invalid_argument& e) {
+            cout << "Invalid record rejected: "
+                 << e.what() << "\n";
+        }
+
+        // Display student details
+        cout << "\nSTUDENT RESULT DETAILS\n";
+
+        for (const Result& s : students) {
+            cout << "\n-------------------------\n";
+            s.displayRecord();
+        }
+
+        // Find students above specified marks
+        float threshold = 250;
+
+        cout << "\nStudents scoring above "
+             << threshold << " total marks:\n";
+
+        vector<Result> aboveThreshold;
+
+        copy_if(
+            students.begin(),
+            students.end(),
+            back_inserter(aboveThreshold),
+            [threshold](const Result& s) {
+                return s.getTotal() > threshold;
+            }
+        );
+
+        for (const Result& s : aboveThreshold) {
+            cout << s.getName() << " - "
+                 << s.getTotal() << " marks\n";
+        }
+
+        // Save records
+        saveToFile(students, "student_results.txt");
+
+        cout << "\nRecords saved to student_results.txt\n";
+
+        // Retrieve records
+        vector<Result> retrieved =
+            loadFromFile("student_results.txt");
+
+        cout << "\nRETRIEVED RECORDS FROM FILE\n";
+
+        for (const Result& s : retrieved) {
+            cout << "\n-------------------------\n";
+            s.displayRecord();
+        }
+
+    }
+    catch (const exception& e) {
+        cerr << "Error: " << e.what() << "\n";
+    }
+
+    return 0;
+}
